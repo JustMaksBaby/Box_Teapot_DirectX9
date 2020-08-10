@@ -1,169 +1,124 @@
 #include <Windows.h>
-#include "d3d9helper.h"
-#include "Utility3D.h"
+#include <stdint.h>
 
+// TYPE DEFINITIONS
+typedef int32_t int32;
+typedef int16_t int16;
+typedef int8_t int8;
 
+typedef uint32_t uint32;
+typedef uint16_t uint16;
+typedef uint8_t  uint8;
 
-
+//LIBS
 #pragma comment(lib, "d3dx9.lib")
 #pragma comment(lib, "winmm.lib")
+#pragma comment(lib, "d3d9.lib") 
+#pragma comment(lib, "user32.lib")
+#pragma comment(lib, "Gdi32.lib")
 
+//- 
 #define global_var static
 
-global_var IDirect3DDevice9* Device = 0;
-
-// vertices
-global_var D3DXMATRIX world; 
-global_var IDirect3DVertexBuffer9 * Triangle= nullptr ;
-
-
-struct ColorVertex
-{
-	ColorVertex() {};
-	ColorVertex(float x, float y, float z, D3DCOLOR c)
-	{
-		_x = x;	 _y = y;  _z = z;  _color = c;
-	}
-	float _x, _y, _z;
-	D3DCOLOR _color;
-	static const DWORD FVF;
-};
-const DWORD ColorVertex::FVF = D3DFVF_XYZ | D3DFVF_DIFFUSE;
+//GLOBAL VARIABLES
+HWND hWnd_g = nullptr; // window handler 
+uint32 screenWidth_g = 600; //window width
+uint32 screenHeight_g = 600; // width height
 
 
-//screen size 
-const int width_g  = 800;
-const int height_g = 600;
-
-
-bool Setup()
-{
-	Device->CreateVertexBuffer(
-		3 * sizeof(ColorVertex),
-		D3DUSAGE_WRITEONLY,
-		ColorVertex::FVF,
-		D3DPOOL_MANAGED,
-		&Triangle,
-		0);
-
-
-	// Заполнение буферов данными куба
-	ColorVertex* v;
-	Triangle->Lock(0, 0, (void**)&v, 0);
-
-	v[0] = ColorVertex(-1.0f, 0.0f, 2.0f,D3DCOLOR_XRGB(255, 0, 0)); 
-	v[0] = ColorVertex( 0.0f, 1.0f, 2.0f,D3DCOLOR_XRGB(0, 255, 0)); 
-	v[0] = ColorVertex( 1.0f, 0.0f, 2.0f,D3DCOLOR_XRGB(0, 0, 255)); 
-
-	Triangle->Unlock(); 
-
-
-	D3DXVECTOR3 position(0.0f, 0.0f, -5.0f);
-	D3DXVECTOR3 target(0.0f, 0.0f, 0.0f);
-	D3DXVECTOR3 up(0.0f, 1.0f, 0.0f);
-	D3DXMATRIX V;
-	D3DXMatrixLookAtLH(&V, &position, &target, &up);
-
-	Device->SetTransform(D3DTS_VIEW, &V);
-
-
-	D3DXMATRIX proj;
-	D3DXMatrixPerspectiveFovLH(
-		&proj,
-		D3DX_PI * 0.5f, // 90 градусов
-		(float)width_g / (float)height_g,
-		1.0f,
-		1000.0f);
-	Device->SetTransform(D3DTS_PROJECTION, &proj);
-	Device->SetRenderState(D3DRS_LIGHTING, false);
-
-
-
-	return true;
-}
-
-void Cleanup()
-{
-	d3d::Release<IDirect3DVertexBuffer9*>(Triangle);
-}
-
-bool Display(float timeDelta)
-{
-	if (Device)
-	{ 
-		Device->Clear(0, 0,
-			D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER,
-			0xffffffff, 1.0f, 0);
-		Device->BeginScene();
-
-		Device->SetFVF(ColorVertex::FVF);
-		Device->SetStreamSource(0, Triangle, 0, sizeof(ColorVertex));
-
-		D3DXMatrixTranslation(&world, -1.25f, 0.0f, 0.0f); 
-		Device->SetTransform(D3DTS_WORLD, &world); 
-
-		Device->SetRenderState(D3DRS_SHADEMODE, D3DSHADE_FLAT);
-		Device->DrawPrimitive(D3DPT_TRIANGLELIST, 0, 1); 
-
-
-		D3DXMatrixTranslation(&world, 1.25f, 0.0f, 0.0f); 
-		Device->SetTransform(D3DTS_WORLD, &world);
-
-		Device->SetRenderState(D3DRS_SHADEMODE, D3DSHADE_GOURAUD);
-		Device->DrawPrimitive(D3DPT_TRIANGLELIST, 0, 1);
-
-		Device->EndScene();
-		Device->Present(0, 0, 0, 0);
-	}
-
-	return true; 
-}
-
-//
-// WndProc
-//
-LRESULT CALLBACK d3d::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	switch (msg)
 	{
 	case WM_DESTROY:
-		::PostQuitMessage(0);
-		break;
-
-	case WM_KEYDOWN:
-		if (wParam == VK_ESCAPE)
-			::DestroyWindow(hwnd);
+	{	::PostQuitMessage(0);
 		break;
 	}
-	return ::DefWindowProc(hwnd, msg, wParam, lParam);
+	case WM_KEYDOWN:
+	{
+		if (wParam == VK_ESCAPE)
+			::DestroyWindow(hWnd);
+	}break;
+	}
+	return ::DefWindowProc(hWnd, msg, wParam, lParam);
 }
 
+bool InitWindow(uint32 width, uint32 height)
+{
+	
+	//CREATE CLASS
+	WNDCLASS wc{};
+	wc.style = CS_HREDRAW | CS_VREDRAW;
+	wc.lpfnWndProc = (WNDPROC)WndProc;
+	wc.cbClsExtra = 0;
+	wc.cbWndExtra = 0;
+	wc.hInstance = GetModuleHandle(NULL);
+	wc.hIcon = LoadIcon(0, IDI_APPLICATION);
+	wc.hCursor = LoadCursor(0, IDC_ARROW);
+	wc.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
+	wc.lpszMenuName = 0;
+	wc.lpszClassName = L"Direct3D9App";
+
+	if (!RegisterClass(&wc))
+	{
+		::MessageBox(0, L"RegisterClass() - FAILED", 0, 0);
+		return false;
+	}
+	//END CREATE CLASS
+
+
+	//CREATE WINDOW
+	hWnd_g = CreateWindow(
+		L"Direct3D9App", 
+		L"Direct3D9App",
+		WS_EX_TOPMOST|WS_SYSMENU,
+		0, 0,
+		width, height,
+		0 /*parent hwnd*/, 
+		0 /* menu */, 
+		GetModuleHandle(NULL), 
+		0 /*extra*/);
+
+	if (!hWnd_g)
+	{
+		::MessageBox(0, L"CreateWindow() - FAILED", 0, 0);
+		return false;
+	}
+
+	ShowWindow(hWnd_g, SW_SHOW);
+	//END CREATE WINDOW
+
+	return true; 
+}
 //
 // WinMain
 //
-int WINAPI WinMain(HINSTANCE hinstance,
-	HINSTANCE prevInstance,
-	PSTR cmdLine,
-	int showCmd)
+int WINAPI wWinMain(HINSTANCE hinstance,
+					HINSTANCE prevInstance,
+					PWSTR cmdLine,
+					int showCmd)
 {
-	if (!d3d::InitD3D(hinstance,
-		640, 480, true, D3DDEVTYPE_HAL, &Device))
+	
+	if (InitWindow(screenWidth_g, screenHeight_g))
 	{
-		::MessageBox(0, "InitD3D() - FAILED", 0, 0);
-		return 0;
-	}
+		MSG msg{};
+		//GAME LOOP 
+		while (msg.message != WM_QUIT)
+		{
 
-	if (!Setup())
-	{
-		::MessageBox(0, "Setup() - FAILED", 0, 0);
-		return 0;
-	}
+			if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+			{
+				TranslateMessage(&msg);
+				DispatchMessage(&msg);
+			}
+			else
+			{
+				// 
+			}
 
-	d3d::EnterMsgLoop(Display);
-
-	Cleanup();
-
-	Device->Release();
+		}
+	} 
 
 	return 0;
 }
+
