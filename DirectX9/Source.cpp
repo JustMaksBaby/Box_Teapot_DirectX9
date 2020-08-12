@@ -3,6 +3,8 @@
 #include <d3dx9.h>
 #include <d3d9.h>
 
+#include "Vertex.h"
+
 // TYPE DEFINITIONS
 typedef int32_t int32;
 typedef int16_t int16;
@@ -29,7 +31,15 @@ uint32 g_ScreenHeight = 600; // width height
 #define RELEASE(obj) if(obj != nullptr){obj->Release();obj = nullptr;}
 //GLOBAL DIRECT3D VARIABLES
 static IDirect3DDevice9*  g_Device = nullptr;
+static IDirect3DVertexBuffer9* g_Vertex = nullptr;
  
+
+void SetRenderStates()
+{
+	g_Device->SetRenderState(D3DRS_ZENABLE, TRUE);  // Z BUFFER ON/ TURNDER ON BY DEFAUT
+	g_Device->SetRenderState(D3DRS_FILLMODE, D3DFILL_WIREFRAME);
+}
+
 bool InitDirect3D()
 {
 	// create Direct object
@@ -46,10 +56,11 @@ bool InitDirect3D()
 	param.SwapEffect = D3DSWAPEFFECT_DISCARD;  
 	param.hDeviceWindow = g_hWnd; 
 	param.EnableAutoDepthStencil = TRUE; // z-buffer
-	param.AutoDepthStencilFormat = D3DFMT_A8R8G8B8; // z-buffer
+	param.AutoDepthStencilFormat = D3DFMT_D16; // z-buffer
+	
 
 	//create device
-	DWORD vertexProcessing = supportsHardwareVertexProcessing?  D3DCREATE_HARDWARE_VERTEXPROCESSING : D3DCREATE_SOFTWARE_VERTEXPROCESSING; 
+	DWORD vertexProcessing = supportsHardwareVertexProcessing ?  D3DCREATE_HARDWARE_VERTEXPROCESSING : D3DCREATE_SOFTWARE_VERTEXPROCESSING; 
 	directObj->CreateDevice(D3DADAPTER_DEFAULT,
 		D3DDEVTYPE_HAL,
 		param.hDeviceWindow,
@@ -57,30 +68,107 @@ bool InitDirect3D()
 		&param,
 		&g_Device); 
 
+	if (!directObj)
+	{
+		MessageBox(0,  L"InitDirect3D -> FAILED initialize a device",NULL, MB_OK); 
+		return false; 
+	}
+
 	// release Direct object
 	RELEASE(directObj)
 
+	return true; 
 	
 }
 
-// CREATE VERTEX
+void SetCamera()
+{
 
-// SETUP DIRECT3D ENVIRONMENT
-	/* 
-	-> SETUP  VIEW TRANSFORMATION
-	-> SETUP  PROJECTION TRANSFORMATION 
-	-> 
-	*/
+	
+	// //  set camera position	
+	// D3DXVECTOR3 position = { 20.0f, 20.0f, 30.0f };
+	// D3DXVECTOR3 lookAt = { 0,0,0 };
+	// D3DXVECTOR3 up = { 0.0f, 1.0f, 0.0f };
+	// 
+	// D3DXMATRIX camera{};
+	// D3DXMatrixLookAtLH(&camera, &position, &lookAt, &up);
+	// g_Device->SetTransform(D3DTS_VIEW, &camera);
 
-//SETUP GRAPHIC OBJECTS 
-	/*
-	-> create and fill vertex buffer
-	-> create teapot ojb
-	*/
+	//set projection 
+	D3DXMATRIX projection; 
+	D3DXMatrixPerspectiveFovLH(
+		&projection,
+		D3DXToRadian(45),
+		(float)g_ScreenWidth / (float)g_ScreenHeight,
+		1.0f,
+		1000.0f); 
+	
+	g_Device->SetTransform(D3DTS_PROJECTION, &projection); 
 
+	// SETUP DIRECT3D ENVIRONMENT
+		/*
+		-> SETUP  VIEW TRANSFORMATION 
+		-> SETUP  PROJECTION TRANSFORMATION+
+		->
+		*/
+} 
+
+
+
+void SetGraphics()
+{
+
+	g_Device->CreateVertexBuffer(
+		sizeof(Vertex) * 6,
+		0,
+		VERTEX_FVF,
+		D3DPOOL_MANAGED,
+		&g_Vertex,
+		NULL
+	);
+
+	Vertex* vertices = nullptr;
+	g_Vertex->Lock(0, 0, (void**)&vertices, 0);
+
+
+
+	vertices[0] = { -1.0f, 1.0f, 2.0f };
+	vertices[1] = { 1.0f, 1.0f, 2.0f };
+	vertices[2] = { -1.0f, -1.0f, 2.0f } ;
+	vertices[3] = { -1.0f,-1.0f, 2.0f }; 
+	vertices[4] = { 1.0f, 1.0f, 2.0f };
+	vertices[5] = { 1.0f, -1.0f, 2.0f };
+	
+
+	
+	g_Vertex->Unlock(); 
+	//SETUP GRAPHIC OBJECTS 
+		/*
+		-> create and fill vertex buffer + 
+		-> create teapot ojb
+		*/
+}
+
+void RenderFrame()
+{
+	// set world position
+	//D3DXMATRIX world{};
+	//D3DXMatrixTranslation(&world, 2.0f, 2.0f, 2.0f);
+	//g_Device->SetTransform(D3DTS_WORLD, &world);
+
+	g_Device->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, D3DCOLOR_XRGB(255, 255, 255), 1.0F, 0); 
+	g_Device->BeginScene();
+
+	g_Device->SetFVF(VERTEX_FVF); 
+	g_Device->SetStreamSource(0, g_Vertex, 0, sizeof(Vertex)); 
+	g_Device->DrawPrimitive(D3DPT_TRIANGLELIST, 0, 2); 
+
+	g_Device->EndScene(); 
+	g_Device->Present(0, 0, 0, 0); 
+}
 // DRAW FUNCTION
 	/*
-	-> CLEAN BUFFER
+	-> CLEAN BUFFER + 
 	-> SET WORLD MATRIX
 	-> DRAW OBJECTS
 	*/
@@ -89,6 +177,7 @@ bool InitDirect3D()
 void ReleaseDirectObjects()
 {
 	// usign to free Direct obj
+	RELEASE(g_Vertex)
 }
 
 
@@ -127,7 +216,7 @@ bool InitWindow(uint32 width, uint32 height)
 
 	if (!RegisterClass(&wc))
 	{
-		::MessageBox(0, L"RegisterClass() - FAILED", 0, 0);
+		MessageBox(0, L"InitWindow ->  FAILED register the class", NULL, 0);
 		return false;
 	}
 	//END CREATE CLASS
@@ -147,7 +236,7 @@ bool InitWindow(uint32 width, uint32 height)
 
 	if (!g_hWnd)
 	{
-		::MessageBox(0, L"CreateWindow() - FAILED", 0, 0);
+		::MessageBox(0, L"InitWindow  -> FAILED create window", NULL, 0);
 		return false;
 	}
 
@@ -156,9 +245,7 @@ bool InitWindow(uint32 width, uint32 height)
 
 	return true; 
 }
-//
-// WinMain
-//
+
 int WINAPI wWinMain(HINSTANCE hinstance,
 					HINSTANCE prevInstance,
 					PWSTR cmdLine,
@@ -167,24 +254,32 @@ int WINAPI wWinMain(HINSTANCE hinstance,
 	
 	if (InitWindow(g_ScreenWidth, g_ScreenHeight))
 	{
-		MSG msg{};
-		//GAME LOOP 
-		while (msg.message != WM_QUIT)
+		if (InitDirect3D())
 		{
+			SetRenderStates(); 
+			SetCamera(); 
+			SetGraphics(); 
 
-			if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+			MSG msg{};
+			//GAME LOOP 
+			while (msg.message != WM_QUIT)
 			{
-				TranslateMessage(&msg);
-				DispatchMessage(&msg);
-			}
-			else
-			{
-				// 
-			}
 
-		}
+				if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+				{
+					TranslateMessage(&msg);
+					DispatchMessage(&msg);
+				}
+				else
+				{
+					RenderFrame();
+				}
+
+			}
+		} 
 	} 
 
+	RELEASE(g_Device)
 	return 0;
 }
 
