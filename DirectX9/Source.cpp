@@ -24,20 +24,36 @@ typedef uint8_t  uint8;
 
 //GLOBAL  COMMON VARIABLES
 HWND g_hWnd = nullptr; // window handler 
-uint32 g_ScreenWidth = 600; //window width
-uint32 g_ScreenHeight = 600; // width height
+uint32 g_ScreenWidth = 640; //window width
+uint32 g_ScreenHeight = 480; // width height
 
 // DELETE DIRECT3D OBJECTS 
 #define RELEASE(obj) if(obj != nullptr){obj->Release();obj = nullptr;}
-//GLOBAL DIRECT3D VARIABLES
-static IDirect3DDevice9*  g_Device = nullptr;
-static IDirect3DVertexBuffer9* g_Vertex = nullptr;
- 
 
-void SetRenderStates()
+//GLOBAL DIRECT3D VARIABLES
+static IDirect3DDevice9*  g_Device		= nullptr;
+static IDirect3DVertexBuffer9* g_Vertex = nullptr;
+static IDirect3DTexture9* g_Texture      = nullptr; 
+ 
+void ReleaseDirectObjects()
+{
+	// usign to free Direct obj
+	g_Vertex->Release(); 
+	g_Device->Release();
+	g_Texture->Release(); 
+}
+
+void SetStates()
 {
 	g_Device->SetRenderState(D3DRS_ZENABLE, TRUE);  // Z BUFFER ON/ TURNDER ON BY DEFAUT
-	g_Device->SetRenderState(D3DRS_FILLMODE, D3DFILL_WIREFRAME);
+	g_Device->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID); // HOW TO SHOW THE VERTICES
+	g_Device->SetRenderState(D3DRS_LIGHTING, FALSE); // TURN ON THE LIGHT/ TURNED ON BY DEFAULT
+
+	// STATES FOR TEXTURES FILTRATION
+	g_Device->SetSamplerState(0, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR); 
+	g_Device->SetSamplerState(0, D3DSAMP_MINFILTER, D3DTEXF_LINEAR); 
+	g_Device->SetSamplerState(0, D3DSAMP_MIPFILTER, D3DTEXF_LINEAR); 
+
 }
 
 bool InitDirect3D()
@@ -84,30 +100,30 @@ bool InitDirect3D()
 void SetCamera()
 {
 
-	
-	// //  set camera position	
-	// D3DXVECTOR3 position = { 20.0f, 20.0f, 30.0f };
-	// D3DXVECTOR3 lookAt = { 0,0,0 };
-	// D3DXVECTOR3 up = { 0.0f, 1.0f, 0.0f };
-	// 
-	// D3DXMATRIX camera{};
-	// D3DXMatrixLookAtLH(&camera, &position, &lookAt, &up);
-	// g_Device->SetTransform(D3DTS_VIEW, &camera);
+	 //  set camera position	
+	 D3DXVECTOR3 position = { 0.0f, 0.0f, -3.0f};
+	 D3DXVECTOR3 lookAt = { 0,0,0 };
+	 D3DXVECTOR3 up = { 0.0f, 1.0f, 0.0f };
+	 
+	 D3DXMATRIX camera{};
+	 D3DXMatrixLookAtLH(&camera, &position, &lookAt, &up);
+	 g_Device->SetTransform(D3DTS_VIEW, &camera);
 
-	//set projection 
+
+	//set  camera projection 
 	D3DXMATRIX projection; 
 	D3DXMatrixPerspectiveFovLH(
 		&projection,
-		D3DXToRadian(45),
+		D3DXToRadian(90),
 		(float)g_ScreenWidth / (float)g_ScreenHeight,
 		1.0f,
-		1000.0f); 
+		100.0f); 
 	
 	g_Device->SetTransform(D3DTS_PROJECTION, &projection); 
 
 	// SETUP DIRECT3D ENVIRONMENT
 		/*
-		-> SETUP  VIEW TRANSFORMATION 
+		-> SETUP  VIEW TRANSFORMATION  +
 		-> SETUP  PROJECTION TRANSFORMATION+
 		->
 		*/
@@ -127,20 +143,20 @@ void SetGraphics()
 		NULL
 	);
 
+
 	Vertex* vertices = nullptr;
 	g_Vertex->Lock(0, 0, (void**)&vertices, 0);
 
 
+	vertices[0] = Vertex(-10.0f, -10.0f, 8.0f, 0.0f, 1.0f);
+	vertices[1] = Vertex(-10.0f,  10.0f, 8.0f, 0.0f, 0.0f);
+	vertices[2] = Vertex(10.0f,   10.0f, 8.0f, 1.0f, 0.0f);
 
-	vertices[0] = { -1.0f, 1.0f, 2.0f };
-	vertices[1] = { 1.0f, 1.0f, 2.0f };
-	vertices[2] = { -1.0f, -1.0f, 2.0f } ;
-	vertices[3] = { -1.0f,-1.0f, 2.0f }; 
-	vertices[4] = { 1.0f, 1.0f, 2.0f };
-	vertices[5] = { 1.0f, -1.0f, 2.0f };
-	
+	vertices[3] = Vertex(-10.0f, -10.0f, 8.0f, 0.0f, 1.0f);
+	vertices[4] = Vertex(10.0f,   10.0f, 8.0f, 1.0f, 0.0f);
+	vertices[5] = Vertex(10.0f,  -10.0f, 8.0f, 1.0f, 1.0f);
 
-	
+
 	g_Vertex->Unlock(); 
 	//SETUP GRAPHIC OBJECTS 
 		/*
@@ -151,33 +167,48 @@ void SetGraphics()
 
 void RenderFrame()
 {
-	// set world position
-	//D3DXMATRIX world{};
-	//D3DXMatrixTranslation(&world, 2.0f, 2.0f, 2.0f);
-	//g_Device->SetTransform(D3DTS_WORLD, &world);
+	// SET WORLD MATRIX
+	D3DXMATRIX world{};
+	D3DXMatrixIdentity(&world);
+	g_Device->SetTransform(D3DTS_WORLD, &world);
 
-	g_Device->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, D3DCOLOR_XRGB(255, 255, 255), 1.0F, 0); 
+	//START DRAWING
+	g_Device->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, D3DCOLOR_XRGB(255, 255, 255), 1.0F, 0);
 	g_Device->BeginScene();
 
-	g_Device->SetFVF(VERTEX_FVF); 
-	g_Device->SetStreamSource(0, g_Vertex, 0, sizeof(Vertex)); 
-	g_Device->DrawPrimitive(D3DPT_TRIANGLELIST, 0, 2); 
+	g_Device->SetFVF(VERTEX_FVF);
+	g_Device->SetStreamSource(0, g_Vertex, 0, sizeof(Vertex));
+	g_Device->DrawPrimitive(D3DPT_TRIANGLELIST, 0, 2);
 
-	g_Device->EndScene(); 
-	g_Device->Present(0, 0, 0, 0); 
-}
+	g_Device->EndScene();
+	g_Device->Present(0, 0, 0, 0);
+
 // DRAW FUNCTION
 	/*
-	-> CLEAN BUFFER + 
-	-> SET WORLD MATRIX
+	-> SET WORLD MATRIX +
+	-> CLEAN BUFFER +
 	-> DRAW OBJECTS
+		-> DRAW SQUARE
+		-> DRAW A TEAPOT
 	*/
 
+}
 
-void ReleaseDirectObjects()
+void LoadTexture(LPCWSTR textureFile)
 {
-	// usign to free Direct obj
-	RELEASE(g_Vertex)
+	if (g_Texture != nullptr)
+	{
+		RELEASE(g_Texture)
+	}
+
+	if (SUCCEEDED(D3DXCreateTextureFromFile(g_Device, textureFile, &g_Texture)))
+	{
+		g_Device->SetTexture(0, g_Texture); 
+	}
+	else
+	{
+		MessageBox(0, L"Couldn`t load a texture", 0, MB_OK); 
+	}
 }
 
 
@@ -256,9 +287,11 @@ int WINAPI wWinMain(HINSTANCE hinstance,
 	{
 		if (InitDirect3D())
 		{
-			SetRenderStates(); 
+			SetStates(); 
 			SetCamera(); 
 			SetGraphics(); 
+
+			LoadTexture(L"crate.jpg"); 
 
 			MSG msg{};
 			//GAME LOOP 
@@ -276,6 +309,8 @@ int WINAPI wWinMain(HINSTANCE hinstance,
 				}
 
 			}
+
+			ReleaseDirectObjects(); 
 		} 
 	} 
 
