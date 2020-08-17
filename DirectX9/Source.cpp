@@ -34,20 +34,29 @@ uint32 g_ScreenHeight = 480; // width height
 static IDirect3DDevice9*  g_Device		= nullptr;
 static IDirect3DVertexBuffer9* g_Vertex = nullptr;
 static IDirect3DTexture9* g_Texture      = nullptr; 
- 
+static ID3DXMesh* g_Teapot = nullptr; 
+
+// MATERIALS
+static D3DMATERIAL9 g_BgrMtrl; 
+static D3DMATERIAL9 g_TeapotMtrl; 
+
+
 void ReleaseDirectObjects()
 {
 	// usign to free Direct obj
 	g_Vertex->Release(); 
 	g_Device->Release();
 	g_Texture->Release(); 
+	g_Teapot->Release(); 
 }
 
 void SetStates()
 {
 	g_Device->SetRenderState(D3DRS_ZENABLE, TRUE);  // Z BUFFER ON/ TURNDER ON BY DEFAUT
-	g_Device->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID); // HOW TO SHOW THE VERTICES
-	g_Device->SetRenderState(D3DRS_LIGHTING, FALSE); // TURN ON THE LIGHT/ TURNED ON BY DEFAULT
+	g_Device->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID); // HOW TO SHOW THE VERTICES/ SOLID IS ON BY DEFAULT
+	g_Device->SetRenderState(D3DRS_LIGHTING, TRUE); // TURN ON THE LIGHT/ TURNED ON BY DEFAULT
+	g_Device->SetRenderState(D3DRS_AMBIENT, D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f)); 
+
 
 	// STATES FOR TEXTURES FILTRATION
 	g_Device->SetSamplerState(0, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR); 
@@ -129,10 +138,28 @@ void SetCamera()
 		*/
 } 
 
+D3DMATERIAL9 CreateMtrl(D3DXCOLOR color)
+{
+	D3DMATERIAL9 mtrl{};
 
+	mtrl.Ambient = color;
+	mtrl.Diffuse = color;
+	mtrl.Specular = color;
+	mtrl.Emissive = { 0.0f, 0.0f, 0.0f, 1.0f };
+	mtrl.Power = 5.0f;
+
+	return mtrl;
+}
 
 void SetGraphics()
 {
+
+	g_BgrMtrl = CreateMtrl(D3DXCOLOR(1.0F, 1.0F, 1.0F, 1.0F)); 
+	g_TeapotMtrl = CreateMtrl(D3DXCOLOR(1.0F, 0.0F, 0.0F, 1.0F));
+
+	//create teapot
+	D3DXCreateTeapot(g_Device, &g_Teapot, 0); 
+
 
 	g_Device->CreateVertexBuffer(
 		sizeof(Vertex) * 6,
@@ -151,10 +178,10 @@ void SetGraphics()
 	vertices[0] = Vertex(-10.0f, -10.0f, 8.0f, 0.0f, 1.0f);
 	vertices[1] = Vertex(-10.0f,  10.0f, 8.0f, 0.0f, 0.0f);
 	vertices[2] = Vertex(10.0f,   10.0f, 8.0f, 1.0f, 0.0f);
-
+											 			 
 	vertices[3] = Vertex(-10.0f, -10.0f, 8.0f, 0.0f, 1.0f);
 	vertices[4] = Vertex(10.0f,   10.0f, 8.0f, 1.0f, 0.0f);
-	vertices[5] = Vertex(10.0f,  -10.0f, 8.0f, 1.0f, 1.0f);
+	vertices[5] = Vertex(10.0f, -10.0f, 8.0f, 1.0f,  1.0f);
 
 
 	g_Vertex->Unlock(); 
@@ -165,6 +192,7 @@ void SetGraphics()
 		*/
 }
 
+
 void RenderFrame()
 {
 	// SET WORLD MATRIX
@@ -172,13 +200,29 @@ void RenderFrame()
 	D3DXMatrixIdentity(&world);
 	g_Device->SetTransform(D3DTS_WORLD, &world);
 
-	//START DRAWING
-	g_Device->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, D3DCOLOR_XRGB(255, 255, 255), 1.0F, 0);
-	g_Device->BeginScene();
 
+	//START DRAWING
+	g_Device->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, D3DCOLOR_XRGB(255, 255, 255), 1.0F, 0); 
+	g_Device->BeginScene();
 	g_Device->SetFVF(VERTEX_FVF);
+
+
+	//draw a square
 	g_Device->SetStreamSource(0, g_Vertex, 0, sizeof(Vertex));
+	g_Device->SetMaterial(&g_BgrMtrl);
 	g_Device->DrawPrimitive(D3DPT_TRIANGLELIST, 0, 2);
+
+
+	//draw a teapot
+	D3DXMATRIX scaleMatrix{}; 
+	D3DXMatrixScaling(&scaleMatrix, 1.5f, 1.5f, 1.5f); 
+	
+	//set mtrl for the teapot
+	g_Device->SetMaterial(&g_TeapotMtrl); 
+
+	g_Device->SetTransform(D3DTS_WORLD, &(world*scaleMatrix));
+	g_Teapot->DrawSubset(0); 
+	
 
 	g_Device->EndScene();
 	g_Device->Present(0, 0, 0, 0);
@@ -187,9 +231,10 @@ void RenderFrame()
 	/*
 	-> SET WORLD MATRIX +
 	-> CLEAN BUFFER +
-	-> DRAW OBJECTS
-		-> DRAW SQUARE
-		-> DRAW A TEAPOT
+	-> DRAW OBJECTS +
+		-> DRAW SQUARE +
+		-> SET MTRL + 
+		-> DRAW A TEAPOT  + 
 	*/
 
 }
@@ -198,7 +243,8 @@ void LoadTexture(LPCWSTR textureFile)
 {
 	if (g_Texture != nullptr)
 	{
-		RELEASE(g_Texture)
+		g_Texture->Release(); 
+		g_Texture = nullptr;
 	}
 
 	if (SUCCEEDED(D3DXCreateTextureFromFile(g_Device, textureFile, &g_Texture)))
