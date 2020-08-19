@@ -50,13 +50,36 @@ void ReleaseDirectObjects()
 	g_Teapot->Release(); 
 }
 
+void SetLight()
+{
+	D3DLIGHT9 dir{};
+	dir.Type = D3DLIGHT_DIRECTIONAL;
+	dir.Diffuse =  D3DXCOLOR(255,255,255, 255);
+	dir.Specular = D3DXCOLOR(255, 255, 255, 255) * 0.2f;
+	dir.Ambient =  D3DXCOLOR(255, 255, 255, 255) * 0.6f;
+	dir.Direction = D3DXVECTOR3(0.707f, 0.0f, 0.707f);
+
+	g_Device->SetLight(0, &dir);
+	g_Device->LightEnable(0, true);
+}
 void SetStates()
 {
 	g_Device->SetRenderState(D3DRS_ZENABLE, TRUE);  // Z BUFFER ON/ TURNDER ON BY DEFAUT
 	g_Device->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID); // HOW TO SHOW THE VERTICES/ SOLID IS ON BY DEFAULT
-	g_Device->SetRenderState(D3DRS_LIGHTING, TRUE); // TURN ON THE LIGHT/ TURNED ON BY DEFAULT
-	g_Device->SetRenderState(D3DRS_AMBIENT, D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f)); 
 
+
+	//light
+	g_Device->SetRenderState(D3DRS_AMBIENT, D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f)); 
+	g_Device->SetRenderState(D3DRS_LIGHTING, TRUE); // TURN ON THE LIGHT/ TURNED ON BY DEFAULT
+
+
+	//set up blending
+	g_Device->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE); // turn on blending/ by default is off
+	g_Device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD); //  set up an operation for blending
+	g_Device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA); // set factor for the source
+	g_Device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA); // set factor for the destination
+	g_Device->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_DIFFUSE); 
+	g_Device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1); 
 
 	// STATES FOR TEXTURES FILTRATION
 	g_Device->SetSamplerState(0, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR); 
@@ -155,7 +178,7 @@ void SetGraphics()
 {
 
 	g_BgrMtrl = CreateMtrl(D3DXCOLOR(1.0F, 1.0F, 1.0F, 1.0F)); 
-	g_TeapotMtrl = CreateMtrl(D3DXCOLOR(1.0F, 0.0F, 0.0F, 1.0F));
+	g_TeapotMtrl = CreateMtrl(D3DXCOLOR(1.0f,0.0f,0.0f,0.5f));
 
 	//create teapot
 	D3DXCreateTeapot(g_Device, &g_Teapot, 0); 
@@ -257,6 +280,27 @@ void LoadTexture(LPCWSTR textureFile)
 	}
 }
 
+void GetKeyboardInput()
+{
+	float& a = g_TeapotMtrl.Diffuse.a;
+
+	if (GetAsyncKeyState('W') & 0x8000)
+	{
+		a += 0.01f; 
+		if (a > 1.0f)
+		{
+			a = 1.0f; 
+		}
+	}
+	if (GetAsyncKeyState('S') & 0x8000)
+	{
+		a -= 0.01f; 
+		if (a < 0.0f)
+		{
+			a = 0.0f; 
+		}
+	}
+}
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
@@ -336,6 +380,7 @@ int WINAPI wWinMain(HINSTANCE hinstance,
 			SetStates(); 
 			SetCamera(); 
 			SetGraphics(); 
+			SetLight();
 
 			LoadTexture(L"crate.jpg"); 
 
@@ -351,6 +396,7 @@ int WINAPI wWinMain(HINSTANCE hinstance,
 				}
 				else
 				{
+					GetKeyboardInput(); 
 					RenderFrame();
 				}
 
